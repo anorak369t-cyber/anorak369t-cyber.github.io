@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Product Details - Motor & Tech Parts Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo">
+      <nav>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html">Support</a>
+        <a href="blog.html">Blog</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="product-detail">
+      <div class="product-img-box">
+        <img src="assets/sample-placeholder.png" alt="Product Image" id="productImage">
+      </div>
+      <div class="product-info-box">
+        <h1 id="productTitle">Product Title</h1>
+        <p class="detail-price" id="productPrice">$0.00</p>
+        <p class="detail-desc" id="productDesc">Product description goes here.</p>
+        <ul class="product-features" id="productFeatures"></ul>
+        <div class="detail-actions">
+          <button class="add-cart-btn" id="addCartBtn">Add to Cart</button>
+          <a href="contact.html" class="contact-btn" id="orderBtn">Order/Enquire</a>
+        </div>
+      </div>
+    </section>
+    <section class="back-link">
+      <a href="products.html">&larr; Back to Products</a>
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
+  </footer>
+  <script src="js/main.js"></script>
+  <script src="js/product.js"></script>
+</body>
+</html>

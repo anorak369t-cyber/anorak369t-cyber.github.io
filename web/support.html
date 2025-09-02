@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Support & Cart Help - Motor & Tech Parts Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/search.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo">
+      <nav>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html" class="active">Support</a>
+        <a href="blog.html">Blog</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="support-section">
+      <h1>Support & Order/Cart Help</h1>
+      <div class="support-faq">
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq-list">
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(1)">How do I check out my cart?</button>
+            <div class="faq-answer" id="faq1">
+              Go to your cart and click the <b>Checkout</b> button. You’ll be guided through the secure payment and order process.
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(2)">Can I modify my order after checkout?</button>
+            <div class="faq-answer" id="faq2">
+              Please contact support as soon as possible with your order number. We’ll do our best if your order hasn’t shipped yet!
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(3)">Where can I track my order?</button>
+            <div class="faq-answer" id="faq3">
+              Once shipped, you’ll receive an email with a tracking link. You can also contact support for updates.
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(4)">My payment failed, what do I do?</button>
+            <div class="faq-answer" id="faq4">
+              Please check your card details and try again. If it continues, contact support or try a different payment method.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="support-contact">
+        <h2>Contact Support</h2>
+        <form class="support-form" id="supportForm">
+          <div class="form-group">
+            <label for="supportName">Name:</label>
+            <input type="text" id="supportName" name="supportName" required placeholder="Your name">
+          </div>
+          <div class="form-group">
+            <label for="supportEmail">Email:</label>
+            <input type="email" id="supportEmail" name="supportEmail" required placeholder="you@email.com">
+          </div>
+          <div class="form-group">
+            <label for="supportOrder">Order Number (if any):</label>
+            <input type="text" id="supportOrder" name="supportOrder" placeholder="#123456">
+          </div>
+          <div class="form-group">
+            <label for="supportMsg">How can we help?</label>
+            <textarea id="supportMsg" name="supportMsg" required rows="5" placeholder="Describe your issue or question"></textarea>
+          </div>
+          <button type="submit" class="cta-btn">Send to Support</button>
+          <div id="supportFormMessage"></div>
+        </form>
+      </div>
+      <div class="support-alt">
+        <h3>Other ways to reach us</h3>
+        <p>Email: <a href="mailto:anorack369t@gmail.com">support@motor-tech-hub.com</a></p>
+        <p>Phone: 0758515687/0773444830</p>
+        <p>Live Chat: (Coming soon!)</p>
+      </div>
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
+  </footer>
+  <script src="js/main.js"></script>
+  <script src="js/support.js"></script>
+</body>
+</html>

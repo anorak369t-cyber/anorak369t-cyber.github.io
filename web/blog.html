@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Blog - Motor & Tech Parts Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo">
+      <nav>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html">Support</a>
+        <a href="blog.html" class="active">Blog</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="blog-section">
+      <h1>Our Blog</h1>
+      <p class="blog-intro">Tips, news, and guides for car enthusiasts and tech lovers.</p>
+      <div id="blogList" class="blog-list">
+        <!-- Blog posts will be rendered here -->
+      </div>
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
+  </footer>
+  <script src="js/main.js"></script>
+  <script src="js/blog.js"></script>
+</body>
+</html>

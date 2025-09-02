@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Cart - Motor & Tech Parts Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/search.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo">
+      <nav>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html" class="active">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html">Support</a>
+        <a href="blog.html">Blog</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="cart-section">
+      <h1>Your Shopping Cart</h1>
+      <div id="cartContainer">
+        <!-- Cart items will be rendered here -->
+      </div>
+      <div class="cart-actions">
+        <a href="products.html" class="cta-btn">Continue Shopping</a>
+        <button class="checkout-btn" onclick="checkoutCart()">Checkout</button>
+      </div>
+      <div id="cartMessage"></div>
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
+  </footer>
+  <script src="js/main.js"></script>
+  <script src="js/cart.js"></script>
+</body>
+</html>

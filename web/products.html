@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Products Catalog - Motor & Tech Parts Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo">
+      <nav>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+        <a href="index.html">Home</a>
+        <a href="products.html" class="active">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html">Support</a>
+        <a href="blog.html">Blog</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="catalog-header">
+      <h1>Products Catalog</h1>
+      <p>Browse our selection of top-quality motor parts and computer electronics.</p>
+      <div class="category-filters">
+        <button class="filter-btn active" onclick="filterProducts('all')">All</button>
+        <button class="filter-btn" onclick="filterProducts('motor')">Motor Parts</button>
+        <button class="filter-btn" onclick="filterProducts('electronics')">Computer Electronics</button>
+      </div>
+    </section>
+    <section class="products-grid" id="productsGrid">
+      <!-- Sample products -->
+      <div class="product-card" data-category="motor">
+        <img src="assets/sample-motor1.png" alt="Brake Pads">
+        <h2>Premium Brake Pads</h2>
+        <p class="price">$45.99</p>
+        <p class="desc">High-durability brake pads for all car models.</p>
+        <a href="product.html?id=1" class="view-btn">View Details</a>
+        <button class="add-cart-btn" onclick="addToCart('Premium Brake Pads')">Add to Cart</button>
+      </div>
+      <div class="product-card" data-category="motor">
+        <img src="assets/sample-motor2.png" alt="Spark Plugs">
+        <h2>Platinum Spark Plugs (Set of 4)</h2>
+        <p class="price">$19.99</p>
+        <p class="desc">Boost your engine performance and efficiency.</p>
+        <a href="product.html?id=2" class="view-btn">View Details</a>
+        <button class="add-cart-btn" onclick="addToCart('Platinum Spark Plugs')">Add to Cart</button>
+      </div>
+      <div class="product-card" data-category="electronics">
+        <img src="assets/sample-electronics1.png" alt="Gaming Mouse">
+        <h2>Pro Gaming Mouse</h2>
+        <p class="price">$29.99</p>
+        <p class="desc">Ergonomic, RGB, and ultra-responsive for gamers.</p>
+        <a href="product.html?id=3" class="view-btn">View Details</a>
+        <button class="add-cart-btn" onclick="addToCart('Pro Gaming Mouse')">Add to Cart</button>
+      </div>
+      <div class="product-card" data-category="electronics">
+        <img src="assets/sample-electronics2.png" alt="SSD Drive">
+        <h2>1TB SSD Drive</h2>
+        <p class="price">$89.99</p>
+        <p class="desc">Reliable, fast, and perfect for all desktops & laptops.</p>
+        <a href="product.html?id=4" class="view-btn">View Details</a>
+        <button class="add-cart-btn" onclick="addToCart('1TB SSD Drive')">Add to Cart</button>
+      </div>
+      <!-- More products can be added here -->
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
+  </footer>
+  <script src="js/main.js"></script>
+</body>
+</html>
