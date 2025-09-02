@@ -2,27 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="description" content="Your one-stop shop for motor parts and computer electronics.">
   <title>Motor & Tech Parts Hub</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/search.js"></script>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <script src="js/search.js" defer></script>
 </head>
 <body>
   <header>
     <div class="header-container">
-     <img src="assets/logo.png" alt="Business Logo" class="logo">
-     <nav>
-       <a href="index.html">Home</a>
-       <a href="products.html">Products</a>
-       <a href="cart.html">Cart</a>
-       <a href="contact.html">Contact</a>
-       <a href="support.html">Support</a>
-       <a href="blog.html">Blog</a>
-      <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
-        <input type="text" id="siteSearchInput" placeholder="Search products, blog..." />
-        <button type="submit" class="site-search-btn">&#128269;</button>
-        <div id="siteSearchResults" class="site-search-results"></div>
-      </form>
-    </nav>
+      <img src="assets/logo.png" alt="Motor & Tech Parts Hub Logo" class="logo" loading="lazy">
+      <nav role="navigation">
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="contact.html">Contact</a>
+        <a href="support.html">Customer Support</a>
+        <a href="blog.html">Tech Blog</a>
+        <form id="siteSearchForm" class="site-search-form" autocomplete="off" onsubmit="return false;">
+          <label for="siteSearchInput" class="visually-hidden">Search site</label>
+          <input type="text" id="siteSearchInput" placeholder="Search our catalog or blogs..." />
+          <button type="submit" class="site-search-btn">&#128269;</button>
+          <div id="siteSearchResults" class="site-search-results"></div>
+        </form>
+      </nav>
     </div>
   </header>
   <main>
@@ -35,6 +38,6 @@
   <footer>
     &copy; 2025 Motor & Tech Parts Hub. All rights reserved.
   </footer>
-  <script src="js/main.js"></script>
+  <script src="js/main.js" defer></script>
 </body>
 </html>
