@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Site: Build Blueprint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        .preview-box {
+            transition: all 0.3s ease;
+        }
+        .dark-mode-preview {
+            background-color: #1e293b;
+            color: #f8fafc;
+        }
+        .dark-mode-preview .preview-card {
+            background-color: #334155;
+            border-color: #475569;
+        }
+    </style>
+</head>
+<body class="bg-[#fdfbf7] text-slate-900 font-sans">
+
+    <!-- Chosen Palette: Soft Parchment & Obsidian -->
+    <!-- Application Structure Plan: A project management dashboard that visualizes the "Claude Prompt" requirements. It includes a Tech Stack breakdown, a File Architecture explorer, and a Theme Simulator. The theme simulator is the core interaction, allowing the user to see how the requested Tailwind "dark:" modifiers will function in the generated code. -->
+    <!-- Visualization & Content Choices: 
+        1. Build Requirements -> Data Distribution -> Pie Chart (Chart.js) -> Shows focus area (Auth vs UI vs DB).
+        2. File Structure -> Organization -> Interactive List (JS) -> Visualizes the Next.js App Router tree.
+        3. Theme Simulator -> Preview -> CSS Toggle -> Justifies the need for robust dark mode logic.
+        Confirming NO SVG/Mermaid used. 
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <div class="max-w-5xl mx-auto px-6 py-10">
+        <header class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-slate-900 uppercase">Project Blueprint</h1>
+                <p class="text-slate-500 mt-2 italic">Visualizing the Claude development prompt for your school site.</p>
+            </div>
+            <div class="flex bg-slate-200 p-1 rounded-lg">
+                <button onclick="switchTab('plan')" id="tab-plan" class="tab-btn px-4 py-1.5 rounded-md text-sm font-bold bg-white shadow-sm">Build Plan</button>
+                <button onclick="switchTab('ui')" id="tab-ui" class="tab-btn px-4 py-1.5 rounded-md text-sm font-medium text-slate-600">UI & Theming</button>
+                <button onclick="switchTab('files')" id="tab-files" class="tab-btn px-4 py-1.5 rounded-md text-sm font-medium text-slate-600">File Tree</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- BUILD PLAN SECTION -->
+            <section id="section-plan" class="content-section space-y-10">
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mb-4">1</div>
+                        <h3 class="font-bold text-lg">Next.js Core</h3>
+                        <p class="text-sm text-slate-500 mt-2">App Router setup with TypeScript and Tailwind CSS for the frontend backbone.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold mb-4">2</div>
+                        <h3 class="font-bold text-lg">Auth & Identity</h3>
+                        <p class="text-sm text-slate-500 mt-2">Clerk integration for session management and role-based JWT generation.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold mb-4">3</div>
+                        <h3 class="font-bold text-lg">Data Layer</h3>
+                        <p class="text-sm text-slate-500 mt-2">Supabase connection utilizing RLS policies and the profiles table for secure data fetching.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 class="text-xl font-bold mb-6">Prompt Effort Distribution</h2>
+                    <div class="chart-container">
+                        <canvas id="effortChart"></canvas>
+                    </div>
+                    <div class="mt-6 text-center text-sm text-slate-400">
+                        The prompt directs Claude to focus heavily on the <span class="text-slate-800 font-bold">Integration Logic</span> between Clerk and Supabase.
+                    </div>
+                </div>
+            </section>
+
+            <!-- UI & THEMING SECTION -->
+            <section id="section-ui" class="content-section hidden space-y-8">
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-xl font-bold">Theme Simulator</h2>
+                            <p class="text-sm text-slate-500">Preview how Claude will implement dual-theme support.</p>
+                        </div>
+                        <button onclick="togglePreviewTheme()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                            Toggle Light/Dark Preview
+                        </button>
+                    </div>
+
+                    <div id="theme-preview-box" class="preview-box p-12 rounded-xl border border-slate-200 bg-slate-50 flex justify-center">
+                        <div class="preview-card w-full max-w-sm p-6 rounded-2xl bg-white border border-slate-200 shadow-xl transition-all">
+                            <div class="h-4 w-24 bg-slate-200 rounded mb-4"></div>
+                            <h4 class="text-xl font-bold mb-2">School Dashboard</h4>
+                            <p class="text-sm opacity-70 mb-6">This card demonstrates how UI components shift between themes using Tailwind classes.</p>
+                            <div class="flex gap-2">
+                                <div class="h-8 w-20 bg-blue-500 rounded-md"></div>
+                                <div class="h-8 w-20 border border-slate-300 rounded-md"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 grid grid-cols-2 gap-4">
+                        <div class="p-4 bg-blue-50 text-blue-800 rounded-lg text-xs">
+                            <strong>Light Mode:</strong> Uses bg-white, text-slate-900, and soft borders.
+                        </div>
+                        <div class="p-4 bg-slate-800 text-slate-200 rounded-lg text-xs">
+                            <strong>Dark Mode:</strong> Uses dark:bg-slate-900, dark:text-white via next-themes.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FILE TREE SECTION -->
+            <section id="section-files" class="content-section hidden space-y-6">
+                <div class="bg-slate-900 text-emerald-400 p-8 rounded-2xl font-mono text-sm overflow-x-auto shadow-2xl">
+                    <div class="mb-4 text-slate-500 border-b border-slate-800 pb-2">// Project Directory Structure</div>
+                    <div class="space-y-1">
+                        <div>app/</div>
+                        <div class="pl-4 text-slate-300">├── layout.tsx <span class="text-slate-500 ml-4">// Root Layout & ThemeProvider</span></div>
+                        <div class="pl-4 text-slate-300">├── page.tsx <span class="text-slate-500 ml-4">// Public Landing & Post Grid</span></div>
+                        <div class="pl-4">└── admin/</div>
+                        <div class="pl-8 text-slate-300">└── page.tsx <span class="text-slate-500 ml-4">// Protected Admin Dashboard</span></div>
+                        <div class="mt-2 text-slate-300">lib/</div>
+                        <div class="pl-4 text-slate-300">└── supabase.ts <span class="text-slate-500 ml-4">// Auth Client with Clerk JWT</span></div>
+                        <div class="mt-2 text-slate-300">components/</div>
+                        <div class="pl-4 text-slate-300">└── theme-toggle.tsx <span class="text-slate-500 ml-4">// Managed via next-themes</span></div>
+                    </div>
+                </div>
+                <div class="p-6 bg-amber-50 border border-amber-100 rounded-xl">
+                    <h4 class="font-bold text-amber-800 mb-2">Critical Logic in `lib/supabase.ts`</h4>
+                    <p class="text-sm text-amber-700">The prompt specifically instructs Claude to use `auth().getToken({ template: 'supabase' })`. This is what makes the RLS policies in the database actually work by passing the user's role and ID to Postgres.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Navigation Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'shadow-sm', 'text-slate-900', 'font-bold');
+                btn.classList.add('text-slate-600', 'font-medium');
+            });
+
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('bg-white', 'shadow-sm', 'text-slate-900', 'font-bold');
+            activeBtn.classList.remove('text-slate-600', 'font-medium');
+        }
+
+        // Theme Toggle Logic
+        let isDark = false;
+        function togglePreviewTheme() {
+            const previewBox = document.getElementById('theme-preview-box');
+            isDark = !isDark;
+            if (isDark) {
+                previewBox.classList.add('dark-mode-preview');
+            } else {
+                previewBox.classList.remove('dark-mode-preview');
+            }
+        }
+
+        // Chart Initialization
+        function initCharts() {
+            const ctx = document.getElementById('effortChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Auth Logic', 'Database Setup', 'UI/Layout', 'Theming'],
+                    datasets: [{
+                        data: [35, 25, 30, 10],
+                        backgroundColor: [
+                            '#3b82f6',
+                            '#10b981',
+                            '#f59e0b',
+                            '#6366f1'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: { weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        window.onload = initCharts;
+    </script>
+</body>
+</html>
