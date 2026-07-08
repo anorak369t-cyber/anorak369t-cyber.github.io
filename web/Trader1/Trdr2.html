@@ -1,0 +1,445 @@
+import React, { useState } from 'react';
+import { 
+  Settings, Code, Zap, Target, Info, CheckCircle, 
+  Copy, Activity, TrendingUp, BarChart3, Filter
+} from 'lucide-react';
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('visualizer');
+  const [copied, setCopied] = useState(false);
+  
+  // Strategy Parameters State
+  const [params, setParams] = useState({
+    bbLength: 20,
+    bbContractionLookback: 100,
+    bbContractionThreshold: 10,
+    volMultiplier: 1.5,
+    volSmaLength: 20,
+    rsiLength: 14,
+    rsiOverbought: 70,
+    rsiOversold: 30,
+    emaLength: 20,
+    riskReward: 2.0,
+    stopBuffer: 0.2,
+    requireEma: true,
+    requireDivergence: false
+  });
+
+  const handleParamChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setParams(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : parseFloat(value)
+    }));
+  };
+
+  const generatePineScript = () => {
+    return `//@version=5
+strategy("Volatility Box Sweep & Wick [Auto-Generated]", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// =========================================================================
+// 1. INPUTS (Tuned via Strategy Lab)
+// =========================================================================
+// Volatility Box
+bbLen = input.int(${params.bbLength}, "BB Length", group="Volatility Box")
+bbMult = input.float(2.0, "BB StdDev", group="Volatility Box")
+bbWLookback = input.int(${params.bbContractionLookback}, "BB Width Lookback", group="Volatility Box")
+bbWThresh = input.float(${params.bbContractionThreshold}, "Contraction Threshold (%)", group="Volatility Box") / 100
+
+// Momentum & Triggers
+volMult = input.float(${params.volMultiplier}, "Volume Spike Multiplier", group="Triggers")
+volLen = input.int(${params.volSmaLength}, "Volume SMA Length", group="Triggers")
+
+// Confluence & Filters
+rsiLen = input.int(${params.rsiLength}, "RSI Length", group="Confluence")
+rsiOB = input.int(${params.rsiOverbought}, "RSI Overbought", group="Confluence")
+rsiOS = input.int(${params.rsiOversold}, "RSI Oversold", group="Confluence")
+emaLen = input.int(${params.emaLength}, "EMA Length", group="Confluence")
+reqEma = input.bool(${params.requireEma}, "Require EMA Alignment?", group="Confluence")
+reqDiv = input.bool(${params.requireDivergence}, "Require RSI Divergence?", group="Confluence")
+
+// Execution & Risk
+rrRatio = input.float(${params.riskReward}, "Risk/Reward Target", group="Execution")
+atrBuffer = input.float(${params.stopBuffer}, "Stop Buffer (ATR Mult)", group="Execution")
+
+// =========================================================================
+// 2. INDICATOR CALCULATIONS
+// =========================================================================
+// Bollinger Band Width
+[basis, upper, lower] = ta.bb(close, bbLen, bbMult)
+bbWidth = (upper - lower) / basis
+minBbWidth = ta.lowest(bbWidth, bbWLookback)
+
+// Condition: Is BB Width currently near its lowest in X bars?
+isContracted = bbWidth <= minBbWidth * (1 + bbWThresh)
+
+// Volume & Momentum
+volSma = ta.sma(volume, volLen)
+isVolSpike = volume > (volSma * volMult)
+myRsi = ta.rsi(close, rsiLen)
+myEma = ta.ema(close, emaLen)
+myAtr = ta.atr(14)
+
+// RSI Divergence (Checks last 15 bars for momentum shifting against price)
+bullDivergence = ta.lowest(myRsi, 15)[1] < myRsi and low < ta.lowest(low, 15)[1]
+bearDivergence = ta.highest(myRsi, 15)[1] > myRsi and high > ta.highest(high, 15)[1]
+
+// =========================================================================
+// 3. BOX RANGE DEFINITION
+// =========================================================================
+// Define the "Box" as the highest high and lowest low during BB contraction.
+var float boxHigh = na
+var float boxLow = na
+var bool inBox = false
+
+if isContracted
+    if not inBox[1]
+        boxHigh := high
+        boxLow := low
+    else
+        boxHigh := math.max(nz(boxHigh[1]), high)
+        boxLow := math.min(nz(boxLow[1]), low)
+    inBox := true
+else
+    boxHigh := nz(boxHigh[1])
+    boxLow := nz(boxLow[1])
+    inBox := false
+
+// =========================================================================
+// 4. TRIGGER CONDITIONS
+// =========================================================================
+// Downside Sweep -> Long
+longSweep = low < boxLow and close > boxLow and isVolSpike 
+longEmaCheck = reqEma ? close > myEma : true
+longDivCheck = reqDiv ? bullDivergence : true
+longConfluence = myRsi <= rsiOS and longEmaCheck and longDivCheck
+validLong = longSweep and longConfluence
+
+// Upside Sweep -> Short
+shortSweep = high > boxHigh and close < boxHigh and isVolSpike
+shortEmaCheck = reqEma ? close < myEma : true
+shortDivCheck = reqDiv ? bearDivergence : true
+shortConfluence = myRsi >= rsiOB and shortEmaCheck and shortDivCheck
+validShort = shortSweep and shortConfluence
+
+// =========================================================================
+// 5. EXECUTION & EXIT LOGIC
+// =========================================================================
+if validLong and strategy.position_size == 0
+    sl = low - (myAtr * atrBuffer)
+    dist = close - sl
+    tp = close + (dist * rrRatio)
+    strategy.entry("Long Sweep", strategy.long)
+    strategy.exit("Exit Long", "Long Sweep", stop=sl, limit=tp)
+
+if validShort and strategy.position_size == 0
+    sl = high + (myAtr * atrBuffer)
+    dist = sl - close
+    tp = close - (dist * rrRatio)
+    strategy.entry("Short Sweep", strategy.short)
+    strategy.exit("Exit Short", "Short Sweep", stop=sl, limit=tp)
+
+// =========================================================================
+// 6. VISUALS
+// =========================================================================
+plot(boxHigh, "Box High", color=color.new(color.gray, 50), style=plot.style_stepline)
+plot(boxLow, "Box Low", color=color.new(color.gray, 50), style=plot.style_stepline)
+plot(myEma, "EMA", color=color.new(color.yellow, 0))
+bgcolor(isContracted ? color.new(color.blue, 90) : na, title="Contraction Phase")
+bgcolor(validLong ? color.new(color.green, 80) : na, title="Long Signal")
+bgcolor(validShort ? color.new(color.red, 80) : na, title="Short Signal")
+`;
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generatePineScript());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const VisualizerTab = () => (
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+      <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-xl flex flex-col items-center">
+        <h3 className="text-xl font-bold text-slate-200 mb-6 flex items-center gap-2">
+          <Zap className="text-cyan-400" size={24}/>
+          Anatomy of a Bullish Volatility Sweep
+        </h3>
+        
+        {/* Schematic Canvas */}
+        <div className="relative w-full max-w-3xl h-[450px] bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-6 flex flex-col items-center justify-start p-4">
+          <svg viewBox="0 0 800 450" className="w-full h-full">
+            {/* --- PRICE ACTION SECTION --- */}
+            
+            {/* EMA Line */}
+            <path d="M 50 250 Q 300 220 500 240 T 750 180" fill="none" stroke="#eab308" strokeWidth="3" strokeDasharray="6 4" opacity="0.8" />
+            <text x="60" y="240" fill="#eab308" fontSize="12" fontWeight="bold">EMA 20 Dynamic Support</text>
+
+            {/* Box definition */}
+            <rect x="100" y="80" width="300" height="130" fill="rgba(59, 130, 246, 0.1)" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4 4" />
+            <text x="110" y="70" fill="#94a3b8" fontSize="14" fontWeight="bold">BB Contraction Box</text>
+            
+            {/* Range candles (in box) */}
+            {[1, 2, 3, 4, 5].map((i) => {
+              const x = 120 + (i * 45);
+              return (
+                <g key={i}>
+                  <line x1={x} y1={90 + Math.random()*20} x2={x} y2={190 - Math.random()*20} stroke="#cbd5e1" strokeWidth="2"/>
+                  <rect x={x-5} y={110 + Math.random()*10} width="10" height={40 + Math.random()*20} fill={i % 2 === 0 ? "#ef4444" : "#22c55e"} />
+                </g>
+              )
+            })}
+
+            {/* The Sweep Candle */}
+            <g transform="translate(420, -20)">
+              {/* Wick */}
+              <line x1="0" y1="120" x2="0" y2="300" stroke="#cbd5e1" strokeWidth="3"/>
+              {/* Body */}
+              <rect x="-10" y="190" width="20" height="40" fill="#22c55e" />
+              {/* Arrow and label for sweep */}
+              <path d="M -20 280 Q -70 280 -70 240" fill="none" stroke="#f472b6" strokeWidth="2" markerEnd="url(#arrow)" />
+              <text x="-150" y="235" fill="#f472b6" fontSize="12" fontWeight="bold">Liquidity Sweep Wick</text>
+              
+              {/* Stop Loss Line */}
+              <line x1="-30" y1="315" x2="30" y2="315" stroke="#ef4444" strokeWidth="2" strokeDasharray="2 2"/>
+              <text x="40" y="320" fill="#ef4444" fontSize="12">Stop = Wick Ext. + Buffer</text>
+            </g>
+
+            {/* Target */}
+            <line x1="400" y1="40" x2="600" y2="40" stroke="#22c55e" strokeWidth="2" strokeDasharray="4 4"/>
+            <text x="610" y="45" fill="#22c55e" fontSize="14" fontWeight="bold">Take Profit (2x Risk)</text>
+            <path d="M 420 150 Q 500 150 500 50" fill="none" stroke="#22c55e" strokeWidth="2" markerEnd="url(#arrowGreen)" />
+
+            {/* --- VOLUME SUB-CHART SECTION --- */}
+            <line x1="50" y1="350" x2="750" y2="350" stroke="#334155" strokeWidth="1" />
+            <text x="60" y="340" fill="#94a3b8" fontSize="12" fontWeight="bold">Volume SMA</text>
+            <path d="M 50 400 Q 200 405 400 395 T 750 400" fill="none" stroke="#64748b" strokeWidth="2" strokeDasharray="4 4" />
+            
+            {/* Range Volume Bars */}
+            {[1, 2, 3, 4, 5].map((i) => {
+              const x = 120 + (i * 45);
+              const height = 10 + Math.random()*20;
+              return (
+                <rect key={'vol'+i} x={x-4} y={430-height} width="8" height={height} fill="#475569" />
+              )
+            })}
+
+            {/* Spike Volume Bar */}
+            <rect x="416" y="360" width="8" height="70" fill="#a855f7" />
+            <text x="430" y="375" fill="#a855f7" fontSize="12" fontWeight="bold">Volume Spike (&gt;{params.volMultiplier}x)</text>
+
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#f472b6" />
+              </marker>
+              <marker id="arrowGreen" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#22c55e" />
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        {/* Breakdown Text */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="text-cyan-400 font-bold text-sm mb-2 flex items-center gap-2"><Target size={14}/> 1. The Box</h4>
+            <p className="text-xs text-slate-300">BB Width falls into the tightest {params.bbContractionThreshold}% of its {params.bbContractionLookback}-bar history, creating a trapped energy box.</p>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="text-fuchsia-400 font-bold text-sm mb-2 flex items-center gap-2"><Zap size={14}/> 2. The Sweep</h4>
+            <p className="text-xs text-slate-300">A wick pierces the box limit and price rejects back inside on a {params.volMultiplier}x Volume climax, trapping breakout traders.</p>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="text-emerald-400 font-bold text-sm mb-2 flex items-center gap-2"><Filter size={14}/> 3. Confluence</h4>
+            <p className="text-xs text-slate-300">RSI confirms oversold/overbought extremes.{params.requireDivergence ? ' Divergence required.' : ''} EMA 20 acts as directional confirmation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-cyan-500/30">
+      {/* Top Navbar */}
+      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10 px-6 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="bg-cyan-500/20 p-2 rounded-lg">
+            <Activity className="text-cyan-400" size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Volatility Sweep Pro</h1>
+            <p className="text-xs text-slate-400">Algorithmic Strategy Lab & Code Generator</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setActiveTab('visualizer')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'visualizer' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800/50'}`}
+          >
+            Visualizer
+          </button>
+          <button 
+            onClick={() => setActiveTab('code')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'code' ? 'bg-cyan-600 text-white' : 'hover:bg-slate-800/50'}`}
+          >
+            Pine Script Code
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left Sidebar: Control Panel */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl h-[700px] overflow-y-auto custom-scrollbar">
+            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2 sticky top-0 bg-slate-900 py-2 z-10 border-b border-slate-800">
+              <Settings size={18} /> Strategy Parameters
+            </h2>
+            
+            <div className="space-y-6">
+              {/* Group 1: Volatility Box */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-cyan-400 flex items-center gap-2">
+                  <BarChart3 size={16}/> 1. Volatility Box
+                </h3>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>BB Length</span>
+                    <span>{params.bbLength}</span>
+                  </label>
+                  <input type="range" name="bbLength" min="10" max="50" value={params.bbLength} onChange={handleParamChange} className="w-full accent-cyan-500" />
+                </div>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>Width Lookback (Bars)</span>
+                    <span>{params.bbContractionLookback}</span>
+                  </label>
+                  <input type="range" name="bbContractionLookback" min="50" max="200" step="10" value={params.bbContractionLookback} onChange={handleParamChange} className="w-full accent-cyan-500" />
+                </div>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>Near Low Threshold (%)</span>
+                    <span>{params.bbContractionThreshold}%</span>
+                  </label>
+                  <input type="range" name="bbContractionThreshold" min="1" max="25" value={params.bbContractionThreshold} onChange={handleParamChange} className="w-full accent-cyan-500" />
+                </div>
+              </div>
+
+              {/* Group 2: Triggers */}
+              <div className="space-y-4 pt-2 border-t border-slate-800/50">
+                <h3 className="text-sm font-semibold text-fuchsia-400 flex items-center gap-2">
+                  <Zap size={16}/> 2. Execution Triggers
+                </h3>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>Volume Spike (x Avg)</span>
+                    <span>{params.volMultiplier}x</span>
+                  </label>
+                  <input type="range" name="volMultiplier" min="1.0" max="4.0" step="0.1" value={params.volMultiplier} onChange={handleParamChange} className="w-full accent-fuchsia-500" />
+                </div>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>RSI Overbought / Oversold</span>
+                    <span>{params.rsiOverbought} / {params.rsiOversold}</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input type="number" name="rsiOverbought" value={params.rsiOverbought} onChange={handleParamChange} className="w-1/2 bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:border-fuchsia-500 transition-colors" />
+                    <input type="number" name="rsiOversold" value={params.rsiOversold} onChange={handleParamChange} className="w-1/2 bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:border-fuchsia-500 transition-colors" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 3: Confluence Filters */}
+              <div className="space-y-3 pt-2 border-t border-slate-800/50">
+                <h3 className="text-sm font-semibold text-yellow-400 flex items-center gap-2">
+                  <Filter size={16}/> 3. Confluence Filters
+                </h3>
+                <label className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-200">Require EMA Alignment</span>
+                    <span className="text-[10px] text-slate-500">Price must be on correct side of EMA20</span>
+                  </div>
+                  <input type="checkbox" name="requireEma" checked={params.requireEma} onChange={handleParamChange} className="w-4 h-4 accent-yellow-500" />
+                </label>
+                
+                <label className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-200">Require RSI Divergence</span>
+                    <span className="text-[10px] text-slate-500">Momentum must shift before price</span>
+                  </div>
+                  <input type="checkbox" name="requireDivergence" checked={params.requireDivergence} onChange={handleParamChange} className="w-4 h-4 accent-yellow-500" />
+                </label>
+              </div>
+
+              {/* Group 4: Risk Management */}
+              <div className="space-y-4 pt-2 border-t border-slate-800/50 pb-4">
+                <h3 className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
+                  <TrendingUp size={16}/> 4. Trade Management
+                </h3>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>Risk:Reward Ratio</span>
+                    <span>1 : {params.riskReward}</span>
+                  </label>
+                  <input type="range" name="riskReward" min="1.0" max="5.0" step="0.5" value={params.riskReward} onChange={handleParamChange} className="w-full accent-emerald-500" />
+                </div>
+                <div>
+                  <label className="flex justify-between text-xs font-medium text-slate-400 mb-1">
+                    <span>Stop Buffer (ATR Multiplier)</span>
+                    <span>{params.stopBuffer}</span>
+                  </label>
+                  <input type="range" name="stopBuffer" min="0" max="1" step="0.1" value={params.stopBuffer} onChange={handleParamChange} className="w-full accent-emerald-500" />
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div className="bg-blue-900/10 border border-blue-900/30 p-4 rounded-xl flex items-start gap-3">
+            <Info className="text-blue-400 shrink-0 mt-0.5" size={16} />
+            <p className="text-xs text-blue-200/70 leading-relaxed">
+              Updates made here instantly rewire the Pine Script execution logic. Copy the code into TradingView to backtest how much the EMA and Divergence filters improve your win rate.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Content Area */}
+        <div className="lg:col-span-8">
+          {activeTab === 'visualizer' && <VisualizerTab />}
+
+          {activeTab === 'code' && (
+            <div className="bg-[#0d1117] border border-slate-800 rounded-xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
+              <div className="bg-slate-900/80 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Code size={18} className="text-slate-400" />
+                  <span className="text-sm font-medium text-slate-300">volatility_sweep.pine</span>
+                </div>
+                <button 
+                  onClick={handleCopy}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+                  {copied ? 'Copied to Clipboard!' : 'Copy Code'}
+                </button>
+              </div>
+              <div className="p-4 overflow-x-auto h-[650px] overflow-y-auto custom-scrollbar">
+                <pre className="text-[13px] text-slate-300 font-mono leading-relaxed">
+                  <code dangerouslySetInnerHTML={{ __html: generatePineScript().replace(/\n/g, '<br/>') }} />
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+      `}} />
+    </div>
+  );
+};
+
+export default App;
