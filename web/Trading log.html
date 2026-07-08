@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Strategy Companion & Playbook</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- React and Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // Custom Notification / Alert Banner instead of native alerts
+        const Notification = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 4000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            const bgClass = type === 'success' ? 'bg-emerald-950 border-emerald-500 text-emerald-200' :
+                            type === 'error' ? 'bg-rose-950 border-rose-500 text-rose-200' :
+                            'bg-indigo-950 border-indigo-500 text-indigo-200';
+
+            return (
+                <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl transition-all duration-300 transform translate-y-0 ${bgClass}`}>
+                    <span className="text-sm font-medium">{message}</span>
+                    <button onClick={onClose} className="hover:opacity-75 focus:outline-none">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            );
+        };
+
+        // Standard Strategy Templates to initialize empty local storage with premium material
+        const defaultSetups = [
+            {
+                id: '1',
+                name: "The Breakout & Retest",
+                timeframe: "15m / 1h",
+                type: "Trend Continuation",
+                description: "Identify clear horizontal or diagonal resistance. Wait for a strong high-volume close above it, then trigger on the first touch of the breakout level acting as new support.",
+                indicators: "20 EMA (Directional Bias), Volume, ATR (for Stops)",
+                entryTriggers: "1. Strong volume expansion breakout.\n2. Limit order at the previous resistance level.\n3. Bullish pinbar or engulfing candle confirming the retest support.",
+                exitRules: "Stop Loss placed just below the breakout swing low. Take profit at 1:2 Minimum Risk-to-Reward, or the next major key psychological level.",
+                winRate: 62
+            },
+            {
+                id: '2',
+                name: "Liquidity Sweep & Reversal",
+                timeframe: "5m / 15m",
+                type: "Counter-Trend / Mean Reversion",
+                description: "Identify key session highs/lows or previous day highs/lows. Wait for price to briefly pierce this level to trigger sell-stops or buy-stops, then quickly close back inside the range.",
+                indicators: "Session Highs/Lows, Volume Profile, RSI (Overbought/Oversold divergence)",
+                entryTriggers: "1. Price sweeps key liquidity pool.\n2. Closes back inside the range within 1-2 candles.\n3. Market order immediately upon confirmation of the close.",
+                exitRules: "Stop Loss set 1-2 pips/points beyond the sweep high/low candle. Take Profit set at the mid-range (1:1.5) and dynamic targets at the opposite side of the range.",
+                winRate: 55
+            }
+        ];
+
+        const defaultRules = [
+            { id: '1', content: "Never risk more than 1.5% of total account equity per trade.", category: "risk" },
+            { id: '2', content: "Walk away for the day after 2 consecutive losses.", category: "psychology" },
+            { id: '3', content: "Never chase a missed entry. Wait for the retest or look for another asset.", category: "execution" },
+            { id: '4', content: "Always trade with a hard stop loss placed at the broker instantly upon entry.", category: "risk" },
+            { id: '5', content: "Review and log every single trade with notes and reflections.", category: "psychology" }
+        ];
+
+        const defaultChecklist = [
+            { id: 'c1', task: "Check the high-impact economic news calendar (ForexFactory / TradingView). No trades within 30m of red folder events.", phase: "pre", done: false },
+            { id: 'c2', task: "Identify macro structure on 4H/Daily charts (Establish directional bias).", phase: "pre", done: false },
+            { id: 'c3', task: "Draw key support/resistance zones and liquidity ranges.", phase: "pre", done: false },
+            { id: 'c4', task: "Verify Stop Loss and Take Profit levels have been calculated strictly via the Risk Calculator.", phase: "execution", done: false },
+            { id: 'c5', task: "Wait patiently for your setup to hit your point of interest. NO front-running.", phase: "execution", done: false },
+            { id: 'c6', task: "Capture dynamic screenshots of the entry pattern and chart setup.", phase: "post", done: false },
+            { id: 'c7', task: "Add completed trade to the Trading Journal with emotional state logs.", phase: "post", done: false }
+        ];
+
+        const defaultJournal = [
+            { id: 'j1', date: "2026-07-01", asset: "EURUSD", type: "LONG", setup: "The Breakout & Retest", riskReward: 2.2, outcome: "WIN", profit: 330, notes: "Perfect execution. Retest hit the 20 EMA confluence perfectly. Exit was neat." },
+            { id: 'j2', date: "2026-07-03", asset: "BTCUSD", type: "SHORT", setup: "Liquidity Sweep & Reversal", riskReward: 1.8, outcome: "LOSS", profit: -150, notes: "Rushed the entry before the 15m candle closed back within the range. Need more patience." },
+            { id: 'j3', date: "2026-07-06", asset: "AAPL", type: "LONG", setup: "The Breakout & Retest", riskReward: 2.5, outcome: "WIN", profit: 500, notes: "Strong momentum move. Kept trailing stop behind 20 EMA to capture the maximum swing." }
+        ];
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [notif, setNotif] = useState(null);
+
+            // LocalStorage Sync for Playbook App state
+            const [setups, setSetups] = useState(() => {
+                const saved = localStorage.getItem('trader_setups');
+                return saved ? JSON.parse(saved) : defaultSetups;
+            });
+
+            const [rules, setRules] = useState(() => {
+                const saved = localStorage.getItem('trader_rules');
+                return saved ? JSON.parse(saved) : defaultRules;
+            });
+
+            const [checklist, setChecklist] = useState(() => {
+                const saved = localStorage.getItem('trader_checklist');
+                return saved ? JSON.parse(saved) : defaultChecklist;
+            });
+
+            const [journal, setJournal] = useState(() => {
+                const saved = localStorage.getItem('trader_journal');
+                return saved ? JSON.parse(saved) : defaultJournal;
+            });
+
+            // Sync with localstorage whenever state changes
+            useEffect(() => {
+                localStorage.setItem('trader_setups', JSON.stringify(setups));
+            }, [setups]);
+
+            useEffect(() => {
+                localStorage.setItem('trader_rules', JSON.stringify(rules));
+            }, [rules]);
+
+            useEffect(() => {
+                localStorage.setItem('trader_checklist', JSON.stringify(checklist));
+            }, [checklist]);
+
+            useEffect(() => {
+                localStorage.setItem('trader_journal', JSON.stringify(journal));
+            }, [journal]);
+
+            const triggerNotif = (message, type = 'success') => {
+                setNotif({ message, type });
+            };
+
+            return (
+                <div className="flex flex-col md:flex-row min-h-screen">
+                    {/* SIDEBAR NAVIGATION */}
+                    <aside className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between flex-shrink-0">
+                        <div>
+                            {/* Brand Header */}
+                            <div className="p-6 border-b border-slate-800">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-lg shadow-lg">
+                                        <svg className="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">QUANTUM</h1>
+                                        <span className="text-xs text-slate-400 font-medium">Strategy & Playbook</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Nav Items */}
+                            <nav className="p-4 space-y-1.5">
+                                <button
+                                    onClick={() => setActiveTab('dashboard')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'dashboard'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+                                    </svg>
+                                    Dashboard
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('playbook')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'playbook'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                    Setups Playbook
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('sandbox')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'sandbox'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    Chart Sandbox
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('calculator')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'calculator'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    Risk & Size Tools
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('journal')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'journal'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                    Trading Journal
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('routines')}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                                        activeTab === 'routines'
+                                            ? 'bg-slate-800 text-emerald-400 border-l-4 border-emerald-500 shadow-md'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                    </svg>
+                                    Habits & Rules
+                                </button>
+                            </nav>
+                        </div>
+
+                        {/* Status Guardrail Indicator */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-900/60">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+                                    <span className="text-xs font-semibold text-amber-300">TRADING PAUSED</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400">Playbook Active</span>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* MAIN CONTENT AREA */}
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                        {activeTab === 'dashboard' && (
+                            <DashboardView
+                                setups={setups}
+                                rules={rules}
+                                setRules={setRules}
+                                journal={journal}
+                                setJournal={setJournal}
+                                checklist={checklist}
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+
+                        {activeTab === 'playbook' && (
+                            <PlaybookView
+                                setups={setups}
+                                setSetups={setSetups}
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+
+                        {activeTab === 'sandbox' && (
+                            <SandboxView
+                                setups={setups}
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+
+                        {activeTab === 'calculator' && (
+                            <CalculatorView
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+
+                        {activeTab === 'journal' && (
+                            <JournalView
+                                journal={journal}
+                                setJournal={setJournal}
+                                setups={setups}
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+
+                        {activeTab === 'routines' && (
+                            <RoutinesView
+                                checklist={checklist}
+                                setChecklist={setChecklist}
+                                rules={rules}
+                                setRules={setRules}
+                                triggerNotif={triggerNotif}
+                            />
+                        )}
+                    </main>
+
+                    {notif && (
+                        <Notification
+                            message={notif.message}
+                            type={notif.type}
+                            onClose={() => setNotif(null)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function DashboardView({ setups, rules, setRules, journal, checklist, triggerNotif }) {
+            const [newRule, setNewRule] = useState("");
+            const [ruleCategory, setRuleCategory] = useState("risk");
+
+            // Calculate metrics derived dynamically from Trading Journal state
+            const metrics = useMemo(() => {
+                if (journal.length === 0) return { winRate: 0, totalPnl: 0, profitFactor: 0, totalTrades: 0, avgRr: 0 };
+                const wins = journal.filter(j => j.outcome === 'WIN');
+                const losses = journal.filter(j => j.outcome === 'LOSS');
+                const winRate = Math.round((wins.length / journal.length) * 100);
+                const totalPnl = journal.reduce((sum, j) => sum + j.profit, 0);
+
+                const totalWinAmt = wins.reduce((sum, j) => sum + j.profit, 0);
+                const totalLossAmt = Math.abs(losses.reduce((sum, j) => sum + j.profit, 0));
+                const profitFactor = totalLossAmt === 0 ? totalWinAmt.toFixed(2) : (totalWinAmt / totalLossAmt).toFixed(2);
+
+                const avgRr = (journal.reduce((sum, j) => sum + j.riskReward, 0) / journal.length).toFixed(1);
+
+                return { winRate, totalPnl, profitFactor, totalTrades: journal.length, avgRr };
+            }, [journal]);
+
+            const handleAddRule = (e) => {
+                e.preventDefault();
+                if (!newRule.trim()) return;
+                const fresh = { id: Date.now().toString(), content: newRule.trim(), category: ruleCategory };
+                setRules([...rules, fresh]);
+                setNewRule("");
+                triggerNotif("Rule pinned to Dashboard successfully", "success");
+            };
+
+            const handleDeleteRule = (id) => {
+                setRules(rules.filter(r => r.id !== id));
+                triggerNotif("Rule removed from playbook", "info");
+            };
+
+            const checklistCompletion = useMemo(() => {
+                if (checklist.length === 0) return 0;
+                const completed = checklist.filter(c => c.done).length;
+                return Math.round((completed / checklist.length) * 100);
+            }, [checklist]);
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                        <div>
+                            <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Strategic Command Overview</span>
+                            <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">Operational Command</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                Local Data Protected
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats Blocks */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden group hover:border-slate-700 transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase text-slate-400">Total Playbook Trades</span>
+                                <span className="text-slate-500"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></span>
+                            </div>
+                            <p className="text-3xl font-extrabold text-white mt-2 code-font">{metrics.totalTrades}</p>
+                            <span className="text-xs text-slate-500 mt-1 block">Live simulated database stats</span>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden group hover:border-slate-700 transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase text-slate-400">Win Rate</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${metrics.winRate >= 50 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                    {metrics.winRate}%
+                                </span>
+                            </div>
+                            <p className="text-3xl font-extrabold text-white mt-2 code-font">{metrics.winRate}%</p>
+                            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                                <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${metrics.winRate}%` }}></div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden group hover:border-slate-700 transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase text-slate-400">Profit Factor</span>
+                                <span className="text-slate-500"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg></span>
+                            </div>
+                            <p className="text-3xl font-extrabold text-white mt-2 code-font">{metrics.profitFactor}</p>
+                            <span className="text-xs text-emerald-400 mt-1 block">Excellent expectation metric</span>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden group hover:border-slate-700 transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase text-slate-400">Simulated Net Profit</span>
+                                <span className={`text-xs font-bold ${metrics.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {metrics.totalPnl >= 0 ? '+$' + metrics.totalPnl : '-$' + Math.abs(metrics.totalPnl)}
+                                </span>
+                            </div>
+                            <p className={`text-3xl font-extrabold mt-2 code-font ${metrics.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {metrics.totalPnl >= 0 ? '+' : '-'}${Math.abs(metrics.totalPnl)}
+                            </p>
+                            <span className="text-xs text-slate-500 mt-1 block">Sum of active database logs</span>
+                        </div>
+                    </div>
+
+                    {/* Left Column: Active Rules | Right Column: Strategy Playbook Brief */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Interactive Iron Rules Section */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    Active Execution & Mindset Rules
+                                </h3>
+
+                                <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-1">
+                                    {rules.map((rule) => (
+                                        <div key={rule.id} className="flex items-start justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition group">
+                                            <div className="flex gap-3">
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-0.5 ${
+                                                    rule.category === 'risk' ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' :
+                                                    rule.category === 'psychology' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' :
+                                                    'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                                                }`}>
+                                                    {rule.category}
+                                                </span>
+                                                <p className="text-sm font-medium text-slate-200">{rule.content}</p>
+                                            </div>
+                                            <button onClick={() => handleDeleteRule(rule.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition ml-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {rules.length === 0 && (
+                                        <p className="text-center text-sm text-slate-500 py-6">No trading laws pinned yet. Write your absolute laws below.</p>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleAddRule} className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-4 border-t border-slate-800">
+                                    <div className="md:col-span-7">
+                                        <input
+                                            type="text"
+                                            placeholder="Write absolute rule (e.g. Stop trading after 2 losses)..."
+                                            value={newRule}
+                                            onChange={(e) => setNewRule(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-3">
+                                        <select
+                                            value={ruleCategory}
+                                            onChange={(e) => setRuleCategory(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                        >
+                                            <option value="risk">Risk Rules</option>
+                                            <option value="psychology">Psychology</option>
+                                            <option value="execution">Execution</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition">
+                                            Pin Rule
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Right: Quick Action Cards */}
+                        <div className="space-y-6">
+                            {/* Checklist Tracker Card */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <h4 className="text-lg font-bold text-white mb-2">Today's Routine Check</h4>
+                                <p className="text-xs text-slate-400 mb-4">Strict checklist helps keep focus stable</p>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-semibold text-slate-300">Habit Met Status</span>
+                                    <span className="text-sm font-bold text-emerald-400 code-font">{checklistCompletion}%</span>
+                                </div>
+                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: `${checklistCompletion}%` }}></div>
+                                </div>
+                                <span className="text-[11px] text-slate-500 mt-3 block leading-relaxed">
+                                    Maintain high focus routines inside the <b>Habits & Rules</b> tab.
+                                </span>
+                            </div>
+
+                            {/* Active Setup Counts */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <h4 className="text-lg font-bold text-white mb-3">Loaded Strategy Models</h4>
+                                <div className="space-y-3">
+                                    {setups.map((setup) => (
+                                        <div key={setup.id} className="flex justify-between items-center p-3 rounded-xl bg-slate-950 border border-slate-800">
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-200">{setup.name}</p>
+                                                <span className="text-[11px] text-slate-500">{setup.timeframe} • {setup.type}</span>
+                                            </div>
+                                            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">
+                                                {setup.winRate}% target
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PlaybookView({ setups, setSetups, triggerNotif }) {
+            const [editingId, setEditingId] = useState(null);
+            const [name, setName] = useState("");
+            const [timeframe, setTimeframe] = useState("");
+            const [type, setType] = useState("Trend Continuation");
+            const [description, setDescription] = useState("");
+            const [indicators, setIndicators] = useState("");
+            const [entryTriggers, setEntryTriggers] = useState("");
+            const [exitRules, setExitRules] = useState("");
+            const [winRate, setWinRate] = useState(50);
+
+            const [showForm, setShowForm] = useState(false);
+
+            const handleSave = (e) => {
+                e.preventDefault();
+                if (!name.trim() || !description.trim()) {
+                    triggerNotif("Setup Name and Core Description are required.", "error");
+                    return;
+                }
+
+                if (editingId) {
+                    // Update
+                    setSetups(setups.map(s => s.id === editingId ? {
+                        id: editingId, name, timeframe, type, description, indicators, entryTriggers, exitRules, winRate: Number(winRate)
+                    } : s));
+                    triggerNotif("Strategy setup updated successfully", "success");
+                } else {
+                    // New
+                    const fresh = {
+                        id: Date.now().toString(),
+                        name, timeframe, type, description, indicators, entryTriggers, exitRules, winRate: Number(winRate)
+                    };
+                    setSetups([...setups, fresh]);
+                    triggerNotif("New strategy setup pinned", "success");
+                }
+
+                resetForm();
+            };
+
+            const handleEdit = (setup) => {
+                setEditingId(setup.id);
+                setName(setup.name);
+                setTimeframe(setup.timeframe);
+                setType(setup.type);
+                setDescription(setup.description);
+                setIndicators(setup.indicators);
+                setEntryTriggers(setup.entryTriggers);
+                setExitRules(setup.exitRules);
+                setWinRate(setup.winRate);
+                setShowForm(true);
+            };
+
+            const handleDelete = (id) => {
+                setSetups(setups.filter(s => s.id !== id));
+                triggerNotif("Strategy setup removed", "info");
+            };
+
+            const resetForm = () => {
+                setEditingId(null);
+                setName("");
+                setTimeframe("");
+                setType("Trend Continuation");
+                setDescription("");
+                setIndicators("");
+                setEntryTriggers("");
+                setExitRules("");
+                setWinRate(50);
+                setShowForm(false);
+            };
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                        <div>
+                            <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Strategic Frameworks</span>
+                            <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">Trading Playbook Setups</h2>
+                        </div>
+                        <button
+                            onClick={() => { if(showForm) { resetForm(); } else { setShowForm(true); } }}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold px-5 py-3 rounded-xl text-sm transition flex items-center gap-2 self-start"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={showForm ? "M19 9l-7 7-7-7" : "M12 4v16m8-8H4"} /></svg>
+                            {showForm ? "Collapse Form" : "Create New Setup Strategy"}
+                        </button>
+                    </div>
+
+                    {showForm && (
+                        <form onSubmit={handleSave} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
+                            <h3 className="text-xl font-bold text-white">{editingId ? "Edit Setup Details" : "Define New Setup Strategy Pattern"}</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Setup Pattern Name *</label>
+                                    <input
+                                        type="text" required value={name} onChange={(e) => setName(e.target.value)}
+                                        placeholder="e.g. Order Block Reclaim"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Execution Timeframes</label>
+                                    <input
+                                        type="text" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}
+                                        placeholder="e.g. 5m Entry, 1H Bias"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Strategy Type</label>
+                                    <select
+                                        value={type} onChange={(e) => setType(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                    >
+                                        <option value="Trend Continuation">Trend Continuation</option>
+                                        <option value="Counter-Trend">Counter-Trend</option>
+                                        <option value="Range Bound">Range Bound</option>
+                                        <option value="Breakout Retest">Breakout Retest</option>
+                                        <option value="Volatility Expansion">Volatility Expansion</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold uppercase text-slate-400">Target Backtested Win Rate</label>
+                                        <span className="text-sm font-bold text-emerald-400 code-font">{winRate}%</span>
+                                    </div>
+                                    <input
+                                        type="range" min="10" max="95" step="1" value={winRate} onChange={(e) => setWinRate(e.target.value)}
+                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Core Narrative / Concept *</label>
+                                    <textarea
+                                        rows="3" required value={description} onChange={(e) => setDescription(e.target.value)}
+                                        placeholder="Describe the underlying logic or flow of the market setup..."
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Key Confluences & Indicators</label>
+                                    <input
+                                        type="text" value={indicators} onChange={(e) => setIndicators(e.target.value)}
+                                        placeholder="e.g. 200 EMA, RSI bullish divergence, daily high liquidity sweep"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Strict Entry Triggers (One per line)</label>
+                                    <textarea
+                                        rows="3" value={entryTriggers} onChange={(e) => setEntryTriggers(e.target.value)}
+                                        placeholder="e.g. Price touches orderblock&#10;5m RSI prints divergence&#10;Limit placed on block high"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase text-slate-400">Take Profit & Stop Loss Rules</label>
+                                    <textarea
+                                        rows="3" value={exitRules} onChange={(e) => setExitRules(e.target.value)}
+                                        placeholder="e.g. Stop below structural swing low. Set TP at 1.5R and trailing stop active afterwards."
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                                <button type="button" onClick={resetForm} className="bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold px-5 py-2.5 rounded-xl text-sm transition">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-xl text-sm transition">
+                                    {editingId ? "Save Strategy Details" : "Commit Strategy to Playbook"}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {setups.map((setup) => (
+                            <div key={setup.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-emerald-500/20 transition-all shadow-xl">
+                                <div>
+                                    <div className="flex justify-between items-start gap-3">
+                                        <div>
+                                            <span className={`text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded ${
+                                                setup.type.includes('Continuation') ? 'bg-indigo-500/10 text-indigo-400' :
+                                                setup.type.includes('Counter') ? 'bg-rose-500/10 text-rose-400' :
+                                                'bg-amber-500/10 text-amber-400'
+                                            }`}>
+                                                {setup.type}
+                                            </span>
+                                            <h3 className="text-xl font-bold text-white mt-1.5">{setup.name}</h3>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xs text-slate-400 font-semibold block">TF: {setup.timeframe || 'Any'}</span>
+                                            <span className="text-xs font-bold text-emerald-400 code-font block mt-0.5">Win Rate: {setup.winRate}%</span>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-sm text-slate-300 mt-4 leading-relaxed">{setup.description}</p>
+
+                                    {setup.indicators && (
+                                        <div className="mt-4 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                                            <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Confluences & Tools</span>
+                                            <span className="text-xs text-emerald-400 font-medium">{setup.indicators}</span>
+                                        </div>
+                                    )}
+
+                                    {setup.entryTriggers && (
+                                        <div className="mt-4">
+                                            <span className="text-xs font-bold text-slate-400 block mb-1">Execution Steps:</span>
+                                            <ol className="list-decimal list-inside space-y-1">
+                                                {setup.entryTriggers.split('\n').map((trigger, idx) => (
+                                                    <li key={idx} className="text-xs text-slate-300 font-medium">{trigger}</li>
+                                                ))}
+                                            </ol>
+                                        </div>
+                                    )}
+
+                                    {setup.exitRules && (
+                                        <div className="mt-4 border-t border-slate-800 pt-3">
+                                            <span className="text-xs font-bold text-rose-400 block mb-1">Stops & Exit Target Rules:</span>
+                                            <p className="text-xs text-slate-300 italic">{setup.exitRules}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-6 border-t border-slate-800/80 mt-6">
+                                    <button onClick={() => handleEdit(setup)} className="text-xs font-semibold text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 rounded-xl transition">
+                                        Edit Parameters
+                                    </button>
+                                    <button onClick={() => handleDelete(setup.id)} className="text-xs font-semibold text-rose-400 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl transition">
+                                        Archive
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+
+                        {setups.length === 0 && (
+                            <div className="lg:col-span-2 text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
+                                <span className="text-4xl">📚</span>
+                                <h4 className="text-lg font-bold text-white mt-3">The Playbook is Empty</h4>
+                                <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Create and design dynamic setup templates to start charting your plans.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function SandboxView({ setups, triggerNotif }) {
+            const canvasRef = useRef(null);
+            const [trend, setTrend] = useState("up"); // up, down, sideways
+            const [indicatorType, setIndicatorType] = useState("ema"); // ema, bands, none
+            const [simulatedCandles, setSimulatedCandles] = useState([]);
+            const [selectedSetup, setSelectedSetup] = useState("");
+            
+            // Interactive sandbox variables
+            const [entryY, setEntryY] = useState(null);
+            const [stopY, setStopY] = useState(null);
+            const [targetY, setTargetY] = useState(null);
+            const [placingTool, setPlacingTool] = useState(null); // 'entry', 'stop', 'target'
+            const [resultMessage, setResultMessage] = useState("");
+
+            // Setup default candle generation on load or trend change
+            useEffect(() => {
+                generateBaseCandles();
+            }, [trend]);
+
+            const generateBaseCandles = () => {
+                const arr = [];
+                let currentPrice = trend === 'up' ? 100 : trend === 'down' ? 500 : 300;
+                
+                for (let i = 0; i < 24; i++) {
+                    let change = (Math.random() - 0.5) * 20;
+                    if (trend === 'up') change += 8; // bias positive
+                    if (trend === 'down') change -= 8; // bias negative
+
+                    const open = currentPrice;
+                    const close = currentPrice + change;
+                    const high = Math.max(open, close) + Math.random() * 8;
+                    const low = Math.min(open, close) - Math.random() * 8;
+
+                    arr.push({ open, close, high, low });
+                    currentPrice = close;
+                }
+                setSimulatedCandles(arr);
+                // Reset tools
+                setEntryY(null);
+                setStopY(null);
+                setTargetY(null);
+                setResultMessage("");
+            };
+
+            // Draw candles inside canvas
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                
+                // Clear Canvas
+                ctx.fillStyle = '#020617'; // slate-950
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw Grid
+                ctx.strokeStyle = '#1e293b'; // slate-800
+                ctx.lineWidth = 0.5;
+                for (let i = 50; i < canvas.width; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                }
+                for (let j = 50; j < canvas.height; j += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, j);
+                    ctx.lineTo(canvas.width, j);
+                    ctx.stroke();
+                }
+
+                // Render Simulated Candlesticks
+                const totalCandles = simulatedCandles.length;
+                if (totalCandles === 0) return;
+
+                const candleWidth = Math.floor(canvas.width / 32);
+                const spacing = 8;
+                const offsetStartX = 20;
+
+                simulatedCandles.forEach((candle, index) => {
+                    const x = offsetStartX + index * (candleWidth + spacing);
+                    const openY = mapValueToY(candle.open, canvas.height);
+                    const closeY = mapValueToY(candle.close, canvas.height);
+                    const highY = mapValueToY(candle.high, canvas.height);
+                    const lowY = mapValueToY(candle.low, canvas.height);
+
+                    const isBullish = candle.close >= candle.open;
+                    ctx.strokeStyle = isBullish ? '#10b981' : '#f43f5e'; // emerald-500 : rose-500
+                    ctx.lineWidth = 2;
+
+                    // Draw Wick (High to Low)
+                    ctx.beginPath();
+                    ctx.moveTo(x + candleWidth / 2, highY);
+                    ctx.lineTo(x + candleWidth / 2, lowY);
+                    ctx.stroke();
+
+                    // Draw Candle Body
+                    ctx.fillStyle = isBullish ? '#10b981' : '#f43f5e';
+                    const rectHeight = Math.abs(closeY - openY) || 2; // secure min height
+                    ctx.fillRect(x, Math.min(openY, closeY), candleWidth, rectHeight);
+                });
+
+                // Render Overlays (EMA or Bollinger Bands)
+                if (indicatorType === 'ema') {
+                    ctx.strokeStyle = '#6366f1'; // indigo-500
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    simulatedCandles.forEach((candle, idx) => {
+                        const x = offsetStartX + idx * (candleWidth + spacing) + candleWidth / 2;
+                        // Simple moving average projection
+                        const emaVal = calculateEMA(simulatedCandles, idx);
+                        const y = mapValueToY(emaVal, canvas.height);
+                        if (idx === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                }
+
+                // Render Interactive Play Lines
+                if (entryY !== null) {
+                    ctx.strokeStyle = '#38bdf8'; // sky-400
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, entryY);
+                    ctx.lineTo(canvas.width, entryY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.font = '10px Inter';
+                    ctx.fillText('ENTRY LEVEL', 10, entryY - 4);
+                }
+
+                if (stopY !== null) {
+                    ctx.strokeStyle = '#f43f5e'; // rose-500
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, stopY);
+                    ctx.lineTo(canvas.width, stopY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.font = '10px Inter';
+                    ctx.fillText('STOP LOSS (SL)', 10, stopY - 4);
+                }
+
+                if (targetY !== null) {
+                    ctx.strokeStyle = '#10b981'; // emerald-500
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, targetY);
+                    ctx.lineTo(canvas.width, targetY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#10b981';
+                    ctx.font = '10px Inter';
+                    ctx.fillText('TAKE PROFIT (TP)', 10, targetY - 4);
+                }
+
+            }, [simulatedCandles, indicatorType, entryY, stopY, targetY]);
+
+            const mapValueToY = (val, canvasHeight) => {
+                // Bounds mapping logic for simulated values [0 - 650]
+                const maxVal = 650;
+                const minVal = 50;
+                const scale = (canvasHeight - 60) / (maxVal - minVal);
+                return canvasHeight - 30 - (val - minVal) * scale;
+            };
+
+            const mapYToValue = (y, canvasHeight) => {
+                const maxVal = 650;
+                const minVal = 50;
+                const scale = (canvasHeight - 60) / (maxVal - minVal);
+                return minVal + (canvasHeight - 30 - y) / scale;
+            };
+
+            const calculateEMA = (candles, idx) => {
+                let sum = 0;
+                let lookback = Math.min(idx + 1, 5);
+                for (let k = idx; k > idx - lookback; k--) {
+                    sum += candles[k].close;
+                }
+                return sum / lookback;
+            };
+
+            const handleCanvasClick = (e) => {
+                const canvas = canvasRef.current;
+                if (!canvas || !placingTool) return;
+                const rect = canvas.getBoundingClientRect();
+                const clickY = e.clientY - rect.top;
+
+                if (placingTool === 'entry') setEntryY(clickY);
+                if (placingTool === 'stop') setStopY(clickY);
+                if (placingTool === 'target') setTargetY(clickY);
+
+                setPlacingTool(null); // release
+            };
+
+            // Simulates the next consecutive candles to see if strategy TP or SL is triggered
+            const runStrategyTest = () => {
+                if (entryY === null || stopY === null || targetY === null) {
+                    triggerNotif("Please plot Entry, Stop Loss, and Take Profit first.", "error");
+                    return;
+                }
+
+                // Check direction
+                const valEntry = mapYToValue(entryY, canvasRef.current.height);
+                const valStop = mapYToValue(stopY, canvasRef.current.height);
+                const valTarget = mapYToValue(targetY, canvasRef.current.height);
+
+                const isLong = valTarget > valEntry;
+
+                // Validate layout setup
+                if (isLong && valStop > valEntry) {
+                    triggerNotif("Stop Loss must be below Entry for Long setup.", "error");
+                    return;
+                }
+                if (!isLong && valStop < valEntry) {
+                    triggerNotif("Stop Loss must be above Entry for Short setup.", "error");
+                    return;
+                }
+
+                // Generate 8 new simulation candles consecutively
+                let tempCandles = [...simulatedCandles];
+                let triggered = false;
+                let triggerMsg = "";
+                let finalOutcome = null;
+
+                let lastPrice = tempCandles[tempCandles.length - 1].close;
+
+                for (let i = 0; i < 8; i++) {
+                    let change = (Math.random() - 0.5) * 35;
+                    // Inject a bit of continuation momentum or swing fluctuation
+                    if (trend === 'up') change += 4;
+                    if (trend === 'down') change -= 4;
+
+                    const open = lastPrice;
+                    const close = lastPrice + change;
+                    const high = Math.max(open, close) + Math.random() * 10;
+                    const low = Math.min(open, close) - Math.random() * 10;
+
+                    tempCandles.push({ open, close, high, low });
+                    lastPrice = close;
+
+                    // Evaluate triggers
+                    if (!triggered) {
+                        if (isLong) {
+                            if (high >= valTarget) {
+                                triggered = true;
+                                finalOutcome = "win";
+                                triggerMsg = `🏆 Take Profit Hit! Simulated target successfully reached inside ${i + 1} candles.`;
+                            } else if (low <= valStop) {
+                                triggered = true;
+                                finalOutcome = "loss";
+                                triggerMsg = `❌ Stop Loss Triggered. Trade invalidated in ${i + 1} candles. Protect your capital.`;
+                            }
+                        } else {
+                            if (low <= valTarget) {
+                                triggered = true;
+                                finalOutcome = "win";
+                                triggerMsg = `🏆 Take Profit Hit (Short Setup)! Target secured in ${i + 1} candles.`;
+                            } else if (high >= valStop) {
+                                triggered = true;
+                                finalOutcome = "loss";
+                                triggerMsg = `❌ Stop Loss Hit (Short Setup). Position stopped out in ${i + 1} candles.`;
+                            }
+                        }
+                    }
+                }
+
+                setSimulatedCandles(tempCandles);
+                if (triggered) {
+                    setResultMessage(triggerMsg);
+                    triggerNotif(finalOutcome === "win" ? "Target Smashed!" : "Stopped Out", finalOutcome === "win" ? "success" : "error");
+                } else {
+                    setResultMessage("⏳ Active. Next 8 candles rendered but neither Stop nor Target has been reached yet. Price is consolidation.");
+                }
+            };
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    <div className="border-b border-slate-800 pb-6">
+                        <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Market Simulator & Sandbox</span>
+                        <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">Interactive Strategy Tester</h2>
+                        <p className="text-slate-400 text-sm mt-2 max-w-2xl">
+                            Test strategy axioms live. Generate custom trends, mark key target trigger bounds using the plotting tools, and render real-time candle progress.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        {/* Interactive Tool Panel */}
+                        <div className="lg:col-span-1 space-y-6 bg-slate-900 border border-slate-800 p-6 rounded-2xl h-fit">
+                            <h3 className="text-lg font-bold text-white">Simulation Controls</h3>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase text-slate-400">Market Bias / Trend</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        onClick={() => setTrend('up')}
+                                        className={`py-2 rounded-xl text-xs font-bold transition ${trend === 'up' ? 'bg-emerald-600 text-slate-950 shadow-md' : 'bg-slate-950 hover:bg-slate-850 text-slate-400'}`}
+                                    >
+                                        Bullish
+                                    </button>
+                                    <button
+                                        onClick={() => setTrend('down')}
+                                        className={`py-2 rounded-xl text-xs font-bold transition ${trend === 'down' ? 'bg-rose-600 text-slate-950 shadow-md' : 'bg-slate-950 hover:bg-slate-850 text-slate-400'}`}
+                                    >
+                                        Bearish
+                                    </button>
+                                    <button
+                                        onClick={() => setTrend('sideways')}
+                                        className={`py-2 rounded-xl text-xs font-bold transition ${trend === 'sideways' ? 'bg-indigo-600 text-slate-950 shadow-md' : 'bg-slate-950 hover:bg-slate-850 text-slate-400'}`}
+                                    >
+                                        Ranging
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase text-slate-400">Overlay Indicator</label>
+                                <select
+                                    value={indicatorType} onChange={(e) => setIndicatorType(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                >
+                                    <option value="none">No Indicator</option>
+                                    <option value="ema">5-EMA (Moving Average)</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-800 space-y-3">
+                                <label className="text-xs font-bold uppercase text-slate-400 block">Interactive Setup Placement</label>
+                                <p className="text-[11px] text-slate-400 leading-normal">Click a target button, then click within the chart canvas coordinate grid to place your setup line.</p>
+                                
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => setPlacingTool('entry')}
+                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition ${
+                                            placingTool === 'entry' ? 'bg-sky-500/20 text-sky-300 border-sky-400' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <span>📍 {entryY ? 'Reposition Entry' : 'Mark Entry Point'}</span>
+                                        <span className="text-[10px] bg-sky-900/40 text-sky-400 px-1.5 py-0.5 rounded code-font">{entryY ? 'Set' : 'Select'}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setPlacingTool('stop')}
+                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition ${
+                                            placingTool === 'stop' ? 'bg-rose-500/20 text-rose-300 border-rose-400' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <span>🛑 {stopY ? 'Reposition Stop' : 'Set Stop Loss'}</span>
+                                        <span className="text-[10px] bg-rose-900/40 text-rose-400 px-1.5 py-0.5 rounded code-font">{stopY ? 'Set' : 'Select'}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setPlacingTool('target')}
+                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition ${
+                                            placingTool === 'target' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <span>🎯 {targetY ? 'Reposition Target' : 'Set Take Profit'}</span>
+                                        <span className="text-[10px] bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded code-font">{targetY ? 'Set' : 'Select'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-800 space-y-3">
+                                <button
+                                    onClick={runStrategyTest}
+                                    className="w-full bg-gradient-to-tr from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-extrabold py-3 rounded-xl text-xs shadow-lg transition"
+                                >
+                                    Simulate Strategy Run
+                                </button>
+                                <button
+                                    onClick={generateBaseCandles}
+                                    className="w-full bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 py-2.5 rounded-xl text-xs transition"
+                                >
+                                    Reset / Re-generate
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Interactive Canvas Output */}
+                        <div className="lg:col-span-3 space-y-4">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden relative">
+                                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                    <span className="px-2.5 py-1 rounded bg-slate-950/80 text-[10px] font-bold tracking-widest text-slate-400 border border-slate-800">SIMULATED MARKET CHART</span>
+                                </div>
+                                <canvas
+                                    ref={canvasRef}
+                                    width={780}
+                                    height={420}
+                                    onClick={handleCanvasClick}
+                                    className={`w-full border border-slate-800 bg-slate-950 rounded-xl block transition-all ${
+                                        placingTool ? 'cursor-crosshair ring-2 ring-indigo-500/40' : 'cursor-default'
+                                    }`}
+                                />
+                            </div>
+
+                            {/* Simulation results banner */}
+                            {resultMessage && (
+                                <div className={`p-4 rounded-xl border text-sm font-semibold transition ${
+                                    resultMessage.includes('🏆') ? 'bg-emerald-950/40 border-emerald-500/35 text-emerald-200' :
+                                    resultMessage.includes('❌') ? 'bg-rose-950/40 border-rose-500/35 text-rose-200' :
+                                    'bg-indigo-950/40 border-indigo-500/35 text-indigo-200'
+                                }`}>
+                                    {resultMessage}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function CalculatorView({ triggerNotif }) {
+            // Position sizing states
+            const [balance, setBalance] = useState(10000);
+            const [riskPercent, setRiskPercent] = useState(1);
+            const [stopLossPips, setStopLossPips] = useState(25);
+            const [pipValue, setPipValue] = useState(10); // Standard value for Lot size 1.0 FX / point value
+            
+            // Compound calculator states
+            const [startingCapital, setStartingCapital] = useState(5000);
+            const [dailyWinRate, setDailyWinRate] = useState(55);
+            const [days, setDays] = useState(30);
+            const [targetRr, setTargetRr] = useState(2);
+            const [riskPerCompoundTrade, setRiskPerCompoundTrade] = useState(1);
+
+            // Compute direct positions size metrics
+            const positionSizeMetrics = useMemo(() => {
+                const totalRisked = (balance * (riskPercent / 100));
+                const lotSizeUnits = (totalRisked / (stopLossPips * pipValue)).toFixed(2);
+                return { totalRisked, lotSizeUnits };
+            }, [balance, riskPercent, stopLossPips, pipValue]);
+
+            // Compute compound curve simulation projection
+            const compoundCurve = useMemo(() => {
+                let current = startingCapital;
+                const arr = [{ day: 0, balance: current }];
+
+                for (let i = 1; i <= days; i++) {
+                    const isWin = Math.random() * 100 <= dailyWinRate;
+                    const tradeRiskAmt = current * (riskPerCompoundTrade / 100);
+
+                    if (isWin) {
+                        current += tradeRiskAmt * targetRr;
+                    } else {
+                        current -= tradeRiskAmt;
+                    }
+
+                    // Lower ceiling guardrail
+                    if (current <= 0) current = 0;
+
+                    arr.push({ day: i, balance: Math.round(current) });
+                }
+                return arr;
+            }, [startingCapital, dailyWinRate, days, targetRr, riskPerCompoundTrade]);
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    <div className="border-b border-slate-800 pb-6">
+                        <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Strategic Quantitative Suite</span>
+                        <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">Risk & Capital Sizer</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Position Size Engine */}
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">Dynamic Position Size Engine</h3>
+                                <p className="text-xs text-slate-400 mt-1">Strict mathematical position sizing guarantees protection against account blowouts.</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs font-bold uppercase text-slate-400">Total Account Balance ($)</label>
+                                        <span className="text-sm font-semibold text-slate-200">${balance.toLocaleString()}</span>
+                                    </div>
+                                    <input
+                                        type="number" value={balance} onChange={(e) => setBalance(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-xs font-bold uppercase text-slate-400">Risk Allocation (%)</label>
+                                            <span className="text-xs text-emerald-400 font-bold">{riskPercent}%</span>
+                                        </div>
+                                        <input
+                                            type="number" step="0.1" value={riskPercent} onChange={(e) => setRiskPercent(Number(e.target.value))}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-xs font-bold uppercase text-slate-400">Stop Loss Distance</label>
+                                            <span className="text-xs text-rose-400 font-bold">{stopLossPips} Pips/Pts</span>
+                                        </div>
+                                        <input
+                                            type="number" value={stopLossPips} onChange={(e) => setStopLossPips(Number(e.target.value))}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Asset Multiplier Value (Per Lot/Unit)</label>
+                                    <select
+                                        value={pipValue} onChange={(e) => setPipValue(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                    >
+                                        <option value="10">Forex Major standard Lot (10.0)</option>
+                                        <option value="1">Forex Micro Lot / Crypto unit (1.0)</option>
+                                        <option value="0.1">Points / Indices (0.1)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Sizer Outputs */}
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                    <span className="text-xs font-bold uppercase text-slate-500 block">Total Capital At Risk</span>
+                                    <p className="text-2xl font-black text-rose-400 code-font mt-1">${positionSizeMetrics.totalRisked.toFixed(2)}</p>
+                                    <span className="text-[10px] text-slate-500">Must not violate iron rules</span>
+                                </div>
+                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                    <span className="text-xs font-bold uppercase text-slate-500 block">Calculated Position Size</span>
+                                    <p className="text-2xl font-black text-emerald-400 code-font mt-1">{positionSizeMetrics.lotSizeUnits} Lots</p>
+                                    <span className="text-[10px] text-slate-500">Scale strictly to size</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Compound Growth Simulator & Curve Projections */}
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">Compound Strategy Simulator</h3>
+                                <p className="text-xs text-slate-400 mt-1">A randomized probability projection engine showing outcome expectation over N sample trades.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Starting Capital ($)</label>
+                                    <input
+                                        type="number" value={startingCapital} onChange={(e) => setStartingCapital(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Target Win Rate (%)</label>
+                                    <input
+                                        type="number" max="95" min="5" value={dailyWinRate} onChange={(e) => setDailyWinRate(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Risk per Trade (%)</label>
+                                    <input
+                                        type="number" value={riskPerCompoundTrade} onChange={(e) => setRiskPerCompoundTrade(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Risk Reward Ratio (R:R)</label>
+                                    <input
+                                        type="number" step="0.1" value={targetRr} onChange={(e) => setTargetRr(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold uppercase text-slate-400">Monte Carlo Simulation Curve</span>
+                                    <span className="text-xs text-emerald-400 font-bold code-font">Target Horizon: {days} Trades</span>
+                                </div>
+
+                                <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1">
+                                    {compoundCurve.slice(-6).reverse().map((step, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-xs p-1.5 border-b border-slate-900/60">
+                                            <span className="text-slate-500">Trade #{step.day}</span>
+                                            <span className={`font-mono font-bold ${step.balance >= startingCapital ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                ${step.balance.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    <p className="text-[10px] text-center text-slate-500 pt-1.5">Last 6 compounding sequence curves displayed.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function JournalView({ journal, setJournal, setups, triggerNotif }) {
+            const [asset, setAsset] = useState("");
+            const [type, setType] = useState("LONG");
+            const [setup, setSetup] = useState("");
+            const [riskReward, setRiskReward] = useState("");
+            const [outcome, setOutcome] = useState("WIN");
+            const [profit, setProfit] = useState("");
+            const [notes, setNotes] = useState("");
+
+            const handleAddTrade = (e) => {
+                e.preventDefault();
+                if (!asset.trim() || !profit || !riskReward) {
+                    triggerNotif("Please fill in asset, target risk-reward, and final profit/loss amount.", "error");
+                    return;
+                }
+
+                // Auto-correct profit values for Losses
+                let parsedProfit = Number(profit);
+                if (outcome === 'LOSS' && parsedProfit > 0) {
+                    parsedProfit = -parsedProfit;
+                }
+
+                const freshTrade = {
+                    id: Date.now().toString(),
+                    date: new Date().toISOString().split('T')[0],
+                    asset: asset.toUpperCase().trim(),
+                    type,
+                    setup: setup || "Default Setup Bias",
+                    riskReward: Number(riskReward),
+                    outcome,
+                    profit: parsedProfit,
+                    notes: notes.trim()
+                };
+
+                setJournal([freshTrade, ...journal]);
+                triggerNotif("Simulated trade added to operational records.", "success");
+
+                // reset
+                setAsset("");
+                setRiskReward("");
+                setProfit("");
+                setNotes("");
+            };
+
+            const handleDeleteTrade = (id) => {
+                setJournal(journal.filter(j => j.id !== id));
+                triggerNotif("Journal trade entry purged.", "info");
+            };
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    <div className="border-b border-slate-800 pb-6">
+                        <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Strategic Journaling</span>
+                        <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">Trading Log & Insights</h2>
+                        <p className="text-slate-400 text-sm mt-2 max-w-2xl">
+                            Log past setups to establish mathematical validation parameters of target rulesets.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Interactive Entry Log Form */}
+                        <div className="lg:col-span-1 bg-slate-900 border border-slate-800 p-6 rounded-2xl h-fit">
+                            <h3 className="text-lg font-bold text-white mb-4">Log Completed Entry</h3>
+                            <form onSubmit={handleAddTrade} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Asset *</label>
+                                        <input
+                                            type="text" required placeholder="e.g. BTCUSD" value={asset} onChange={(e) => setAsset(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Trade Bias</label>
+                                        <div className="grid grid-cols-2 gap-1 bg-slate-950 border border-slate-800 p-0.5 rounded-xl">
+                                            <button
+                                                type="button" onClick={() => setType('LONG')}
+                                                className={`py-1 text-center rounded text-[10px] font-bold transition ${type === 'LONG' ? 'bg-emerald-600 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                LONG
+                                            </button>
+                                            <button
+                                                type="button" onClick={() => setType('SHORT')}
+                                                className={`py-1 text-center rounded text-[10px] font-bold transition ${type === 'SHORT' ? 'bg-rose-600 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                SHORT
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Playbook Setup Model Used</label>
+                                    <select
+                                        value={setup} onChange={(e) => setSetup(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                    >
+                                        <option value="">Select Playbook Setup Template</option>
+                                        {setups.map((s) => (
+                                            <option key={s.id} value={s.name}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs font-bold uppercase text-slate-400 block mb-1">R-Multiple Met *</label>
+                                        <input
+                                            type="number" required step="0.1" placeholder="e.g. 2.5" value={riskReward} onChange={(e) => setRiskReward(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Outcome</label>
+                                        <div className="grid grid-cols-2 gap-1 bg-slate-950 border border-slate-800 p-0.5 rounded-xl">
+                                            <button
+                                                type="button" onClick={() => setOutcome('WIN')}
+                                                className={`py-1 text-center rounded text-[10px] font-bold transition ${outcome === 'WIN' ? 'bg-emerald-600 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                WIN
+                                            </button>
+                                            <button
+                                                type="button" onClick={() => setOutcome('LOSS')}
+                                                className={`py-1 text-center rounded text-[10px] font-bold transition ${outcome === 'LOSS' ? 'bg-rose-600 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                LOSS
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Dollar Return ($) *</label>
+                                    <input
+                                        type="number" required placeholder="e.g. 350" value={profit} onChange={(e) => setProfit(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Narrative Reflections / Lessons</label>
+                                    <textarea
+                                        rows="3" placeholder="Identify mental states, error slips or compliance errors..."
+                                        value={notes} onChange={(e) => setNotes(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs transition"
+                                >
+                                    Commit Log Entry
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* Journal Ledger Log Table */}
+                        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-white mb-4">Historical Trade Ledger</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                                            <th className="pb-3 pr-2">Date / Asset</th>
+                                            <th className="pb-3 pr-2">Setup Bias</th>
+                                            <th className="pb-3 pr-2">R:R Achieved</th>
+                                            <th className="pb-3 pr-2">Net Return</th>
+                                            <th className="pb-3 text-right">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60">
+                                        {journal.map((trade) => (
+                                            <tr key={trade.id} className="hover:bg-slate-950/40 transition group">
+                                                <td className="py-4 pr-2">
+                                                    <div className="font-bold text-white flex items-center gap-1.5">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${trade.type === 'LONG' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                                        {trade.asset}
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 block mt-0.5">{trade.date} • {trade.type}</span>
+                                                </td>
+                                                <td className="py-4 pr-2">
+                                                    <span className="font-medium text-slate-300 block max-w-[150px] truncate">{trade.setup}</span>
+                                                    <span className="text-[10px] text-slate-500 block mt-0.5 truncate max-w-[150px]">{trade.notes}</span>
+                                                </td>
+                                                <td className="py-4 pr-2 font-mono font-bold text-slate-300">{trade.riskReward}R</td>
+                                                <td className={`py-4 pr-2 font-mono font-bold ${trade.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {trade.profit >= 0 ? '+' : '-'}${Math.abs(trade.profit)}
+                                                </td>
+                                                <td className="py-4 text-right">
+                                                    <button onClick={() => handleDeleteTrade(trade.id)} className="text-slate-500 hover:text-rose-400 transition">
+                                                        <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {journal.length === 0 && (
+                                            <tr>
+                                                <td colSpan="5" className="text-center py-12 text-slate-500 font-medium">No completed log files indexed yet. Keep a highly documented history.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function RoutinesView({ checklist, setChecklist, rules, setRules, triggerNotif }) {
+            const [newChecklistText, setNewChecklistText] = useState("");
+            const [checklistPhase, setChecklistPhase] = useState("pre");
+
+            const toggleChecklist = (id) => {
+                setChecklist(checklist.map(item => item.id === id ? { ...item, done: !item.done } : item));
+            };
+
+            const handleAddChecklistItem = (e) => {
+                e.preventDefault();
+                if (!newChecklistText.trim()) return;
+                const fresh = {
+                    id: 'c_' + Date.now(),
+                    task: newChecklistText.trim(),
+                    phase: checklistPhase,
+                    done: false
+                };
+                setChecklist([...checklist, fresh]);
+                setNewChecklistText("");
+                triggerNotif("Routines checklist appended", "success");
+            };
+
+            const handleDeleteChecklistItem = (id) => {
+                setChecklist(checklist.filter(item => item.id !== id));
+                triggerNotif("Item purged", "info");
+            };
+
+            const resetAllChecklistItems = () => {
+                setChecklist(checklist.map(item => ({ ...item, done: false })));
+                triggerNotif("Routines reset for new session", "info");
+            };
+
+            return (
+                <div className="space-y-8 max-w-7xl mx-auto">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                        <div>
+                            <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">Session Habits Tracker</span>
+                            <h2 className="text-3xl font-extrabold tracking-tight text-white mt-1">SOP & Habit Builder</h2>
+                        </div>
+                        <button
+                            onClick={resetAllChecklistItems}
+                            className="bg-slate-900 border border-slate-800 text-slate-300 font-bold px-4 py-2.5 rounded-xl text-xs transition hover:bg-slate-850 self-start"
+                        >
+                            Reset Checklists
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Pre-Market Stage */}
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                                <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    1. Pre-Market Bias Prep
+                                </h3>
+                                <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 rounded bg-slate-950">Strict</span>
+                            </div>
+
+                            <div className="space-y-2">
+                                {checklist.filter(item => item.phase === 'pre').map((item) => (
+                                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 hover:bg-slate-950/80 transition group border border-slate-900">
+                                        <input
+                                            type="checkbox" checked={item.done} onChange={() => toggleChecklist(item.id)}
+                                            className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <div className="flex justify-between w-full items-start">
+                                            <p className={`text-xs font-semibold leading-relaxed ${item.done ? 'line-through text-slate-500' : 'text-slate-300'}`}>{item.task}</p>
+                                            <button onClick={() => handleDeleteChecklistItem(item.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition ml-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Execution Stage */}
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                                <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                    2. Live Trigger Window
+                                </h3>
+                                <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 rounded bg-slate-950">Active</span>
+                            </div>
+
+                            <div className="space-y-2">
+                                {checklist.filter(item => item.phase === 'execution').map((item) => (
+                                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 hover:bg-slate-950/80 transition group border border-slate-900">
+                                        <input
+                                            type="checkbox" checked={item.done} onChange={() => toggleChecklist(item.id)}
+                                            className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <div className="flex justify-between w-full items-start">
+                                            <p className={`text-xs font-semibold leading-relaxed ${item.done ? 'line-through text-slate-500' : 'text-slate-300'}`}>{item.task}</p>
+                                            <button onClick={() => handleDeleteChecklistItem(item.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition ml-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Post-Market Stage */}
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                                <h3 className="text-sm font-bold text-rose-400 flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                    3. Post-Market Logs
+                                </h3>
+                                <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 rounded bg-slate-950">Review</span>
+                            </div>
+
+                            <div className="space-y-2">
+                                {checklist.filter(item => item.phase === 'post').map((item) => (
+                                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 hover:bg-slate-950/80 transition group border border-slate-900">
+                                        <input
+                                            type="checkbox" checked={item.done} onChange={() => toggleChecklist(item.id)}
+                                            className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <div className="flex justify-between w-full items-start">
+                                            <p className={`text-xs font-semibold leading-relaxed ${item.done ? 'line-through text-slate-500' : 'text-slate-300'}`}>{item.task}</p>
+                                            <button onClick={() => handleDeleteChecklistItem(item.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition ml-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Add Form and Mindset Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                            <h4 className="text-lg font-bold text-white mb-3">Add Custom Check Task</h4>
+                            <form onSubmit={handleAddChecklistItem} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Session Stage Phase</label>
+                                    <select
+                                        value={checklistPhase} onChange={(e) => setChecklistPhase(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-300"
+                                    >
+                                        <option value="pre">1. Pre-Market Bias Prep</option>
+                                        <option value="execution">2. Live Trigger Window</option>
+                                        <option value="post">3. Post-Market Logs</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-400 block mb-1">Check Task Routine Description</label>
+                                    <input
+                                        type="text" required placeholder="e.g. Check forex calendar alerts" value={newChecklistText} onChange={(e) => setNewChecklistText(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder:text-slate-500"
+                                    />
+                                </div>
+                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition">
+                                    Approve Task
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* Interactive mindset block */}
+                        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                            <div>
+                                <h4 className="text-lg font-bold text-white mb-2">The Golden Rule of Execution</h4>
+                                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                                    "Your trading system represents your vehicle, your risk policy is your helmet, and your mind is the engine. A fast system and massive leverage are useless if the engine blows itself up on the first steep incline."
+                                </p>
+                            </div>
+                            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                                <span className="text-[10px] font-bold text-indigo-400 block uppercase tracking-wider mb-1">Operational Checklist Status</span>
+                                <p className="text-xs text-slate-300 leading-normal">
+                                    Ensure daily checks are maintained. Write out your strategies, verify sizing, practice on the chart sandbox and strictly backtest entries using the companion tools during your active trading pause.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
