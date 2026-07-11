@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro-SaaS Architect Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8 border-b border-slate-700 pb-6">
+            <h1 class="text-4xl font-bold text-emerald-400">Micro-SaaS Architect Pro</h1>
+            <p class="text-slate-400 mt-2">Evaluate your research pipeline using a multi-factor scoring model.</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Controls -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Available Time (Development Complexity)</label>
+                        <select id="time" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                            <option value="1">Rapid MVP (Weekend Build)</option>
+                            <option value="2">Iterative (2-4 Weeks)</option>
+                            <option value="3">Complex Deep-Build (1+ Months)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Primary Goal</label>
+                        <select id="goal" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                            <option value="revenue">Max Recurring Revenue (B2B)</option>
+                            <option value="workflow">Workflow Intelligence (AI/Ops)</option>
+                        </select>
+                    </div>
+                    <button onclick="calculate()" class="w-full bg-emerald-600 hover:bg-emerald-500 transition font-bold py-3 rounded-lg">
+                        Architect Strategy
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="result" class="bg-slate-800 p-6 rounded-xl border border-emerald-500/30 flex flex-col justify-center items-center text-center">
+                <p class="text-slate-400">Configure your parameters and click "Architect Strategy" to generate a recommendation.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const projects = {
+            scopeSign: { name: "ScopeSign", difficulty: 1, revenue: 3, workflow: 2 },
+            fade: { name: "Fade", difficulty: 1, revenue: 1, workflow: 1 },
+            inventoryBridge: { name: "InventoryBridge", difficulty: 3, revenue: 3, workflow: 2 },
+            paperTrail: { name: "PaperTrail AI", difficulty: 2, revenue: 2, workflow: 3 }
+        };
+
+        function calculate() {
+            const time = parseInt(document.getElementById('time').value);
+            const goal = document.getElementById('goal').value;
+            const output = document.getElementById('result');
+
+            let bestFit = null;
+            let highestScore = -1;
+
+            for (let id in projects) {
+                let p = projects[id];
+                let score = 0;
+                
+                // Weighting logic
+                if (goal === 'revenue') score += (p.revenue * 2) + p.difficulty;
+                else score += (p.workflow * 2) + p.difficulty;
+
+                // Adjust for time constraints
+                if (time === 1 && p.difficulty > 1) score -= 5;
+                if (time === 3 && p.difficulty === 1) score -= 1;
+
+                if (score > highestScore) {
+                    highestScore = score;
+                    bestFit = p;
+                }
+            }
+
+            output.innerHTML = `
+                <div class="space-y-4">
+                    <h2 class="text-2xl font-bold text-emerald-400">${bestFit.name}</h2>
+                    <p class="text-sm text-slate-300">Based on your constraints, this project offers the best balance of build complexity and strategic ROI.</p>
+                    <div class="pt-4 border-t border-slate-700 text-left w-full space-y-2">
+                        <p class="text-xs text-slate-500 uppercase tracking-widest">Key Metric Analysis:</p>
+                        <p class="text-sm">Difficulty: ${"★".repeat(bestFit.difficulty)}</p>
+                        <p class="text-sm">Revenue Potential: ${"★".repeat(bestFit.revenue)}</p>
+                        <p class="text-sm">Workflow Intelligence: ${"★".repeat(bestFit.workflow)}</p>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
+
